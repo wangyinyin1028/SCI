@@ -20,7 +20,7 @@ U12 = [1]
 x = [1]
 M1_2 = [20]
 M2_1 = [20]
-step=100#控制方案
+step=30#控制方案
 
 class MPC():
     def __init__(self):
@@ -328,7 +328,7 @@ class MPC():
         m2=[]
 
         for j in range(step):
-            print('################now is ',j)
+            # print('est_mpc文件################now is ',j)
             if_stop = False  # 是否停止循环，差值小于0.5时停止
             while not if_stop:
                 curent_t = j

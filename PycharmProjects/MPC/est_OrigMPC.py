@@ -22,7 +22,7 @@ x = [1]
 M1_2 = [20]
 M2_1 = [20]
 # step=60#控制方案
-step2=120#放入原始方案
+step2=30#放入原始方案
 
 class MPC_origin():
     def __init__(self):

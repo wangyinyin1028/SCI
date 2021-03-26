@@ -182,128 +182,129 @@ class env(object):
         self.C = 120
         self.vc = {'区域1': np.ones(900), '区域2': np.ones(900)}
 
-    def DuiBi(self, l_xo, BHDl, l_TongXingNL):
+    def DuiBi(self, l_xo, BHDl, l_TongXingNL,T=120):
         if l_xo >= BHDl:
             Q = 0
         else:
-            Q = -(120 * l_TongXingNL / 4) + ((BHDl - 1) ^ 2 + (12 * (BHDl - l_xo)) / (l_TongXingNL * 120))
+            Q = (T * l_TongXingNL / 4) *((BHDl - 1)+ math.sqrt((BHDl - 1)**2 + (12 * (BHDl - l_xo)) / (l_TongXingNL *T)))
         return Q
 
     def DDelay(self, BHD, action,a):
         LXB = action[a] / self.C
         if BHD >= 1:
-            d1 = (self.C - action[0]) / 2
+            d1 = (self.C - action[a]) / 2
         else:
             d1 = self.C * (1 - LXB) ** 2 / (2 * (1 - LXB * BHD))
         return d1
 
-    def delayy(self,v, h,action,a, zuozhuan,zhixing):
-         lL = 0.1
-         l_xo = 0.67 + (lL * action[a]) / 600
+    def delayy(self, h,action,a, zuozhuan,zhixing):
+         T=120
+         l_xo = self.sta_flow/4##饱和流率
          # print('######x参数',l_xo)
-         BHDl = zuozhuan / (self.sta_flow * self.C / 4)
+         l_TongXingNL = 1400/3600
+         BHDl = (zuozhuan/self.C) / l_TongXingNL#饱和度
          # print('######饱和度', BHDl)
-         l_TongXingNL = lL
-         Qcl = env.DuiBi(self, l_xo, BHDl, l_TongXingNL) / l_TongXingNL
+
+         Qcl = env.DuiBi(self, l_xo, BHDl, l_TongXingNL,T) / l_TongXingNL
          # print('######左转随机延误与过饱和延误', Qcl)
-         Dl = env.DDelay(self, BHDl, action, 0)
+         Dl = env.DDelay(self, BHDl, action, a)
          # print('######均衡相位延误', Dl)
          delayl = Qcl + Dl
 
-         lS = 0.2
-         s_xo = 0.67 + (lS * action[0]) / 600
+         s_xo = self.sta_flow/2##饱和流率
          # print('######s_xo参数', s_xo)
-         BHDs = zhixing / (self.sta_flow * self.C / 2)
+         s_TongXingNL = 1400*2 / 3600
+         BHDs = (zhixing /self.C)/s_TongXingNL
          # print('######直行饱和度', BHDs)
-         s_TongXingNL = lS
-         Qcs = env.DuiBi(self, s_xo, BHDs, s_TongXingNL) / s_TongXingNL
+         Qcs = (env.DuiBi(self, s_xo, BHDs, s_TongXingNL) )/ s_TongXingNL
          # print('######直行随机延误与过饱和延误', Qcs)
-         Ds = env.DDelay(self, BHDs, action, 0)
+         Ds = env.DDelay(self, BHDs, action, a)
          delays = Qcs + Ds
          ddd = (delayl * zuozhuan + delays * zhixing)
-         # print('相位%s，现在是路口%s，我是总延误时间哇%s' % (v,h, ddd))
-         return ddd
+         # print('相位%s，现在是路口%s，我是总延误时间哇%s' % (a+1,h, ddd))
+         return round(ddd,4)
+
 
     def Doaction(self, t,a,demand):
-        # delay=[]
         d=demand
         action = Action[a]
+        totalnumber_onetime=0
         # step1:获取路口h各进口道的等待车辆数
         if t > 0:
             for h in range(4):
                 for i in self.n_m:
                     self.n_m[i][t][h] = self.n_m[i][t - 1][h] + self.i_mc[i][t - 1][h] - self.o_m[i][t - 1][h]  # 四个进口的车辆数
                     if self.n_m[i][t][h] <= 0:
-                           self.n_m[i][t][h]=0
+                        self.n_m[i][t][h]=0
                     # print('self.n_m[i][t][h]', self.n_m[i][t][h])
         else:
             pass
         # for h in range(4):
         #     for i in self.n_m:
-                # print('当前时刻为%s,road num is %s,进口道编号是 %s,等待车辆数是%s' %(t,h,i,self.n_m[i][t][h]))
-
+        # print('当前时刻为%s,road num is %s,进口道编号是 %s,等待车辆数是%s' %(t,h,i,self.n_m[i][t][h]))
+        delay_fourroad=[]
+        delay_total=0
         for h in range(4):
             # step2:计算当前时刻各进口道时延
             self.vc['区域1'][0]=7
             self.vc['区域2'][0]=8
             self.td_c['出口1'][t][h] = math.ceil(((self.l1[0] * 1000 * 3 - self.n_m['出口1'][t][h] * self.lv) / (3 * self.vc['区域1'][0] * self.C)))  # 为什么这里的社会车速度不是等于实时的区域平均速度
-            # print( self.n_m['出口3'][t][h])
-
             self.td_c['出口3'][t][h] = math.ceil(((self.l1[3] * 1000 * 3 - self.n_m['出口3'][t][h] * self.lv) / (3 * self.vc['区域2'][0] * self.C)))  # 为什么这里的社会车速度不是等于实时的区域平均速度
             if h == 0:
-                  self.td_c['出口2'][t][h] = 0  # 非控制区域3的需求，直接通过到达率计算
+                self.td_c['出口2'][t][h] = 0  # 非控制区域3的需求，直接通过到达率计算
             else:
-                  self.td_c['出口2'][t][h] =math.ceil(((self.lh[h - 1] * 1000 * 3 - self.n_m['出口2'][t][h] * self.lv) / (3 * self.vc['区域1'][0] * self.C)))
+                self.td_c['出口2'][t][h] =math.ceil(((self.lh[h - 1] * 1000 * 3 - self.n_m['出口2'][t][h] * self.lv) / (3 * self.vc['区域1'][0] * self.C)))
             if h == 3:
-                  self.td_c['出口4'][t][h] = 0  # 非控制区域4的需求，直接通过到达率计算
+                self.td_c['出口4'][t][h] = 0  # 非控制区域4的需求，直接通过到达率计算
             else:
-                  self.td_c['出口4'][t][h] =math.ceil(((self.lh[h] * 1000 * 3 - self.n_m['出口4'][t][h] * self.lv) / (3 * self.vc['区域2'][0] * self.C)))
+                self.td_c['出口4'][t][h] =math.ceil(((self.lh[h] * 1000 * 3 - self.n_m['出口4'][t][h] * self.lv) / (3 * self.vc['区域2'][0] * self.C)))
             cc1 = int(t - abs(self.td_c['出口1'][t][h]))
             cc2 = int(t - abs(self.td_c['出口3'][t][h]))
             cc3 = int(t - abs(self.td_c['出口2'][t][h]))
             cc4 = int(t - abs(self.td_c['出口4'][t][h]))
-              # step3:获得当前时刻各进口道增加的车辆需求
-              ### 四个交叉口中，进口1和进口3的上游不存在交叉口，所以进入该交叉口的车辆数通过需求获得，进口2和进口4可能存在交叉口也可能不存在交叉口，所以进行分类计算
+            # step3:获得当前时刻各进口道增加的车辆需求
+            ### 四个交叉口中，进口1和进口3的上游不存在交叉口，所以进入该交叉口的车辆数通过需求获得，进口2和进口4可能存在交叉口也可能不存在交叉口，所以进行分类计算
             if cc1 >= 0 and cc2 >= 0 and cc3 >= 0 and cc4 >= 0:
-                  self.i_mc['出口1'][t][h] = self.C * (0.25 * d[1_2][cc1])  # 社会车通过logit模型获得分流率r1，获得进入各个路口的车辆数
-                  self.i_mc['出口3'][t][h] = self.C * (0.25 * d[2_1][cc2])
-                  if h == 0:
-                      self.i_mc['出口2'][t][h] = self.C * self.qc1  # 非控制区域3的需求，直接通过到达率计算
-                  else:
-                      self.i_mc['出口2'][t][h] = self.o_m['出口1'][cc3][h - 1] * self.alpha[2] + self.o_m['出口2'][cc3][h - 1] * \
-                                               self.alpha[1] + self.o_m['出口3'][cc3][h - 1] * self.alpha[0]  # 存疑 ，
-                  if h == 3:
-                      self.i_mc['出口4'][t][h] = self.C * self.qc2  # 非控制区域4的需求，直接通过到达率计算
-                  else:
-                      self.i_mc['出口4'][t][h] = self.o_m['出口1'][cc4][h + 1] * self.alpha[0] + self.o_m['出口3'][cc4][h + 1] * \
-                                               self.alpha[2] + self.o_m['出口4'][cc4][h + 1] * self.alpha[1]
+                self.i_mc['出口1'][t][h] = math.ceil(self.C * (0.25 * d[1_2][cc1]) +random.uniform(5, 20))# 社会车通过logit模型获得分流率r1，获得进入各个路口的车辆数
+                self.i_mc['出口3'][t][h] = math.ceil(self.C * (0.25 * d[2_1][cc2]) +random.uniform(5, 20))
+                if h == 0:
+                    self.i_mc['出口2'][t][h] = math.ceil(self.C * self.qc1  +random.uniform(0, 10)) # 非控制区域3的需求，直接通过到达率计算
+                else:
+                    self.i_mc['出口2'][t][h] = math.ceil(self.o_m['出口1'][cc3][h - 1] * self.alpha[2] + self.o_m['出口2'][cc3][h - 1] * \
+                                                       self.alpha[1] + self.o_m['出口3'][cc3][h - 1] * self.alpha[0] +random.uniform(0, 5) ) # 存疑 ，
+                if h == 3:
+                    self.i_mc['出口4'][t][h] = math.ceil(self.C * self.qc2  +random.uniform(0, 10)) # 非控制区域4的需求，直接通过到达率计算
+                else:
+                    self.i_mc['出口4'][t][h] = math.ceil(self.o_m['出口1'][cc4][h + 1] * self.alpha[0] + self.o_m['出口3'][cc4][h + 1] * \
+                                                       self.alpha[2] + self.o_m['出口4'][cc4][h + 1] * self.alpha[1] +random.uniform(0, 5))
             else:
-                  self.i_mc['出口1'][t][h] = 10
-                  self.i_mc['出口3'][t][h] = 10
-                  if h == 0:
-                      self.i_mc['出口2'][t][h] = 10
-                  else:
-                      self.i_mc['出口2'][t][h] = 10
-                  if h == 3:
-                      self.i_mc['出口4'][t][h] = 10
-                  else:
-                      self.i_mc['出口4'][t][h] = 10
+                self.i_mc['出口1'][t][h] =10
+                self.i_mc['出口3'][t][h] = 10
+                if h == 0:
+                    self.i_mc['出口2'][t][h] =10
+                else:
+                    self.i_mc['出口2'][t][h] =10
+                if h == 3:
+                    self.i_mc['出口4'][t][h] = 10
+                else:
+                    self.i_mc['出口4'][t][h] =10
 
-              #step4:各进口道的左直右车辆数
+            #step4:各进口道的左直右车辆数
 
-            # print('进口道1的车辆数',self.n_m['出口1'][t][h])
+
             self.l_m['出口1'][t][h] = math.ceil(self.n_m['出口1'][t][h] * self.alpha[0])
             self.l_m['出口2'][t][h] = math.ceil(self.n_m['出口2'][t][h] * self.alpha[0])
             self.l_m['出口3'][t][h] = math.ceil(self.n_m['出口3'][t][h] * self.alpha[0])
             self.l_m['出口4'][t][h] = math.ceil(self.n_m['出口4'][t][h] * self.alpha[0])
             self.s_m['出口1'][t][h] = math.ceil(self.n_m['出口1'][t][h] * self.alpha[1])
-            self.s_m['出口2'][t][h] = math.ceil(self.n_m['出口2'][t][h] * self.alpha[1])
+            self.s_m['出口2'][t][h] =math.ceil( self.n_m['出口2'][t][h] * self.alpha[1])
             self.s_m['出口3'][t][h] = math.ceil(self.n_m['出口3'][t][h] * self.alpha[1])
             self.s_m['出口4'][t][h] = math.ceil(self.n_m['出口4'][t][h] * self.alpha[1])
             self.r_m['出口1'][t][h] = math.ceil(self.n_m['出口1'][t][h] * self.alpha[2])
             self.r_m['出口2'][t][h] = math.ceil(self.n_m['出口2'][t][h] * self.alpha[2])
-            self.r_m['出口3'][t][h] = math.ceil(self.n_m['出口3'][t][h] * self.alpha[2])
-            self.r_m['出口4'][t][h] = math.ceil(self.n_m['出口4'][t][h] * self.alpha[2])
+            self.r_m['出口3'][t][h] =math.ceil( self.n_m['出口3'][t][h] * self.alpha[2])
+            self.r_m['出口4'][t][h] =math.ceil( self.n_m['出口4'][t][h] * self.alpha[2])
+
             # print('进口1左转', self.l_m['出口1'][t][h])
             # print('进口2左转',self.l_m['出口2'][t][h])
             # print('进口3左转',self.l_m['出口3'][t][h])
@@ -316,74 +317,79 @@ class env(object):
             # print('进口2右转',self.r_m['出口2'][t][h])
             # print('进口3右转',self.r_m['出口3'][t][h])
             # print('进口4右转',self.r_m['出口4'][t][h])
-               #step5：相位绿灯时间转移
-              #相位1
+            #step5：相位绿灯时间转移
+            #相位1
             # print('进口4等待左转车辆数是%s,进口1等待直行的车辆数是%s,此次最大通过数为%s'% (self.l_m['出口4'][t][h],self.s_m['出口1'][t][h],self.sta_flow*action[0]))
             if self.l_m['出口4'][t][h]+self.s_m['出口1'][t][h]<self.sta_flow*action[0]:
-                  self.trans_l_m['出口4'][t][h] = self.l_m['出口4'][t][h]
-                  self.trans_s_m['出口1'][t][h] = self.s_m['出口1'][t][h]
-                  self.trans_r_m['出口2'][t][h] = self.r_m['出口2'][t][h]
-                  # zuozhuan1= self.l_m['出口4'][t][h].copy()
-                  # zhixing1=self.s_m['出口1'][t][h].copy()
-                  # ddd1=env.delayy(self,1, h, action, 0, zuozhuan1, zhixing1)
+                self.trans_l_m['出口4'][t][h] = self.l_m['出口4'][t][h]
+                self.trans_s_m['出口1'][t][h] = self.s_m['出口1'][t][h]
+                self.trans_r_m['出口2'][t][h] = self.r_m['出口2'][t][h]
 
             else:
-                  self.trans_l_m['出口4'][t][h] = (self.l_m['出口4'][t][h]/(self.l_m['出口4'][t][h]+self.s_m['出口1'][t][h]))*self.sta_flow*action[0]
-                  self.trans_s_m['出口1'][t][h] = (self.l_m['出口1'][t][h]/(self.l_m['出口4'][t][h]+self.s_m['出口1'][t][h]))*self.sta_flow*action[0]
-                  self.trans_r_m['出口2'][t][h] = self.r_m['出口2'][t][h]
-            # zuozhuan1 = self.l_m['出口4'][t][h].copy()
-            # zhixing1 = self.s_m['出口1'][t][h].copy()
-            # ddd1 = env.delayy(self, 1, h, action, 0, zuozhuan1, zhixing1)
-
-              #相位2
+                self.trans_l_m['出口4'][t][h] = (self.l_m['出口4'][t][h]/(self.l_m['出口4'][t][h]+self.s_m['出口1'][t][h]))*self.sta_flow*action[0]
+                self.trans_s_m['出口1'][t][h] = (self.l_m['出口1'][t][h]/(self.l_m['出口4'][t][h]+self.s_m['出口1'][t][h]))*self.sta_flow*action[0]
+                self.trans_r_m['出口2'][t][h] = self.r_m['出口2'][t][h]
+            zuozhuan1= self.l_m['出口4'][t][h].copy()# print('#####左转车辆数',zuozhuan1)         # print('#####直行车辆数',zhixing1)
+            zhixing1=self.s_m['出口1'][t][h].copy()
+            a=0
+            ddd1=env.delayy(self, h, action, a, zuozhuan1, zhixing1)#a表示哪个相位，范围为0-3，h表示哪个路口
+            # print('当前相位1的总延误时间',ddd1)
+            #相位2
             if self.l_m['出口2'][t][h]+self.s_m['出口3'][t][h]<self.sta_flow*action[1]:
-                  self.trans_l_m['出口2'][t][h] = self.l_m['出口2'][t][h]
-                  self.trans_s_m['出口3'][t][h] = self.s_m['出口3'][t][h]
-                  self.trans_r_m['出口4'][t][h] = self.r_m['出口4'][t][h]
-                  # zuozhuan2 = self.l_m['出口2'][t][h]
-                  # zhixing2 = self.s_m['出口3'][t][h]
-                  # ddd2 = env.delayy(self, 2, h, action, 1, zuozhuan2, zhixing2)
-
-                  self.trans_l_m['出口2'][t][h] = (self.l_m['出口2'][t][h]/(self.l_m['出口2'][t][h]+self.s_m['出口3'][t][h]))*self.sta_flow*action[1]
-                  self.trans_s_m['出口3'][t][h] = (self.l_m['出口3'][t][h]/(self.l_m['出口2'][t][h]+self.s_m['出口3'][t][h]))*self.sta_flow*action[1]
-                  self.trans_r_m['出口2'][t][h] = self.r_m['出口2'][t][h]
-                  # zuozhuan2 = self.l_m['出口2'][t][h]
-                  # zhixing2 = self.s_m['出口3'][t][h]
-                  # ddd2 = env.delayy(self, 2, h, action, 1, zuozhuan2, zhixing2)
-              # 相位3
+                self.trans_l_m['出口2'][t][h] = self.l_m['出口2'][t][h]
+                self.trans_s_m['出口3'][t][h] = self.s_m['出口3'][t][h]
+                self.trans_r_m['出口4'][t][h] = self.r_m['出口4'][t][h]
+            else:
+                self.trans_l_m['出口2'][t][h] = (self.l_m['出口2'][t][h]/(self.l_m['出口2'][t][h]+self.s_m['出口3'][t][h]))*self.sta_flow*action[1]
+                self.trans_s_m['出口3'][t][h] = (self.l_m['出口3'][t][h]/(self.l_m['出口2'][t][h]+self.s_m['出口3'][t][h]))*self.sta_flow*action[1]
+                self.trans_r_m['出口2'][t][h] = self.r_m['出口2'][t][h]
+            zuozhuan2 = self.l_m['出口2'][t][h].copy()
+            # print('#####左转车辆数', zuozhuan2)
+            zhixing2 = self.s_m['出口3'][t][h].copy()
+            # print('#####直行车辆数', zhixing2)
+            a = 1
+            ddd2 = env.delayy(self, h, action, a, zuozhuan2, zhixing2)  # a表示哪个相位，范围为0-3，h表示哪个路口
+            # print('当前相位2的总延误时间', ddd2)
+            # 相位3
             if self.l_m['出口1'][t][h] + self.s_m['出口2'][t][h] < self.sta_flow * action[2]:
-                  self.trans_l_m['出口1'][t][h] = self.l_m['出口1'][t][h]
-                  self.trans_s_m['出口2'][t][h] = self.s_m['出口2'][t][h]
-                  self.trans_r_m['出口3'][t][h] = self.r_m['出口3'][t][h]
-                  # zuozhuan3 = self.l_m['出口1'][t][h]
-                  # zhixing3 = self.s_m['出口2'][t][h]
-                  # ddd3 = env.delayy(self, 3, h, action, 2, zuozhuan3, zhixing3)
-
+                self.trans_l_m['出口1'][t][h] = self.l_m['出口1'][t][h]
+                self.trans_s_m['出口2'][t][h] = self.s_m['出口2'][t][h]
+                self.trans_r_m['出口3'][t][h] = self.r_m['出口3'][t][h]
             else:
-                  self.trans_l_m['出口1'][t][h] = (self.l_m['出口1'][t][h]/(self.l_m['出口1'][t][h] + self.s_m['出口2'][t][h])) * self.sta_flow * action[2]
-                  self.trans_s_m['出口2'][t][h] = (self.s_m['出口2'][t][h]/(self.l_m['出口1'][t][h] + self.s_m['出口2'][t][h])) * self.sta_flow * action[2]
-                  self.trans_r_m['出口3'][t][h] = self.r_m['出口3'][t][h]
-                  # zuozhuan3 = self.l_m['出口1'][t][h]
-                  # zhixing3 = self.s_m['出口2'][t][h]
-                  # ddd3 = env.delayy(self, 3, h, action, 2, zuozhuan3, zhixing3)
-              # 相位4
+                self.trans_l_m['出口1'][t][h] = (self.l_m['出口1'][t][h]/(self.l_m['出口1'][t][h] + self.s_m['出口2'][t][h])) * self.sta_flow * action[2]
+                self.trans_s_m['出口2'][t][h] = (self.s_m['出口2'][t][h]/(self.l_m['出口1'][t][h] + self.s_m['出口2'][t][h])) * self.sta_flow * action[2]
+                self.trans_r_m['出口3'][t][h] = self.r_m['出口3'][t][h]
+            zuozhuan3 = self.l_m['出口1'][t][h].copy()
+            # print('#####左转车辆数', zuozhuan3)
+            zhixing3 = self.s_m['出口2'][t][h].copy()
+            # print('#####直行车辆数', zhixing3)
+            a = 2
+            ddd3 = env.delayy(self, h, action, a, zuozhuan3, zhixing3)  # a表示哪个相位，范围为0-3，h表示哪个路口
+            # print('当前相位3的总延误时间', ddd3)
+            # 相位4
             if self.l_m['出口3'][t][h] + self.s_m['出口4'][t][h] < self.sta_flow * action[3]:
-                  self.trans_l_m['出口3'][t][h] = self.l_m['出口3'][t][h]
-                  self.trans_s_m['出口4'][t][h] = self.s_m['出口4'][t][h]
-                  self.trans_r_m['出口1'][t][h] = self.r_m['出口1'][t][h]
-                  # zuozhuan4 = self.l_m['出口3'][t][h]
-                  # zhixing4 = self.s_m['出口4'][t][h]
-                  # ddd4 = env.delayy(self, 4, h, action, 3, zuozhuan4, zhixing4)
-
+                self.trans_l_m['出口3'][t][h] = self.l_m['出口3'][t][h]
+                self.trans_s_m['出口4'][t][h] = self.s_m['出口4'][t][h]
+                self.trans_r_m['出口1'][t][h] = self.r_m['出口1'][t][h]
             else:
-                  self.trans_l_m['出口3'][t][h] = (self.l_m['出口3'][t][h] / (self.l_m['出口3'][t][h] + self.s_m['出口4'][t][h]) )* self.sta_flow * action[3]
-                  self.trans_s_m['出口4'][t][h] = (self.s_m['出口4'][t][h]/ (self.l_m['出口3'][t][h] + self.s_m['出口4'][t][h])) * self.sta_flow * action[3]
-                  self.trans_r_m['出口1'][t][h] = self.r_m['出口1'][t][h]
-                  # zuozhuan4 = self.l_m['出口3'][t][h]
-                  # zhixing4 = self.s_m['出口4'][t][h]
-                  # ddd4 = env.delayy(self, 4, h, action, 3, zuozhuan4, zhixing4)
-            # ttdd=ddd1+ddd2+ddd3+ddd4
-            # delay.append(ttdd)
+                self.trans_l_m['出口3'][t][h] = (self.l_m['出口3'][t][h] / (self.l_m['出口3'][t][h] + self.s_m['出口4'][t][h]) )* self.sta_flow * action[3]
+                self.trans_s_m['出口4'][t][h] = (self.s_m['出口4'][t][h]/ (self.l_m['出口3'][t][h] + self.s_m['出口4'][t][h])) * self.sta_flow * action[3]
+                self.trans_r_m['出口1'][t][h] = self.r_m['出口1'][t][h]
+            zuozhuan4 = self.l_m['出口3'][t][h].copy()
+            # print('#####左转车辆数', zuozhuan4)
+            zhixing4 = self.s_m['出口4'][t][h].copy()
+            # print('#####直行车辆数', zhixing4)
+            a = 3
+            ddd4 = env.delayy(self, h, action, a, zuozhuan4, zhixing4)  # a表示哪个相位，范围为0-3，h表示哪个路口
+            # print('当前相位4的总延误时间', ddd4)
+            dd=ddd1+ddd2+ddd3+ddd4
+            delay_total+=dd
+            totalnumber_oneroad= self.l_m['出口1'][t][h]+self.l_m['出口2'][t][h]+self.l_m['出口3'][t][h]+self.l_m['出口4'][t][h]+\
+                                 self.s_m['出口1'][t][h]+ self.s_m['出口2'][t][h]+ self.s_m['出口3'][t][h]+ self.s_m['出口4'][t][h]
+            # totalnumber_oneroad=self.n_m['出口1'][t][h]+self.n_m['出口2'][t][h]+self.n_m['出口3'][t][h]+self.n_m['出口4'][t][h]
+            totalnumber_onetime+=totalnumber_oneroad
+            delay_fourroad.append(dd)
+            print('当前控制时间为%s,路口编号为%s,此控制区间的总延误为%s'%(t,h,dd))
 
             self.remain_s_m['出口1'][t][h] = self.s_m['出口1'][t][h] - self.trans_s_m['出口1'][t][h]
             self.remain_l_m['出口1'][t][h] = self.l_m['出口1'][t][h] - self.trans_l_m['出口1'][t][h]
@@ -415,7 +421,7 @@ class env(object):
 
             self.actal_o_m['1-2'][t][h]=self.trans_l_m['出口4'][t][h]+self.trans_s_m['出口1'][t][h]+self.trans_r_m['出口2'][t][h]
             self.actal_o_m['2-1'][t][h] = self.trans_l_m['出口2'][t][h] + self.trans_s_m['出口3'][t][h] + self.trans_r_m['出口4'][t][h]
-              # print('1-2转移流',t,h,self.actal_o_m['1-2'][t][h])
+            # print('1-2转移流',t,h,self.actal_o_m['1-2'][t][h])
         # print('t时刻0路口区域1到区域2的流量')
         # print(self.trans_l_m['出口4'][t][0])
         # print(self.trans_s_m['出口1'][t][0])
@@ -443,33 +449,35 @@ class env(object):
         # print(self.actal_o_m['2-1'][t][1])
         # print(self.actal_o_m['2-1'][t][2])
         # print(self.actal_o_m['2-1'][t][2])
+        AV_delay=delay_total/totalnumber_onetime
+        print('当前时刻四个路口总延误时间%s,当前时刻四个路口总的交通流%s,每个路口的总延误时间%s,车均延误为%s'%(delay_total,totalnumber_onetime,delay_fourroad,AV_delay))
         a12=self.actal_o_m['1-2'][t][0]+self.actal_o_m['1-2'][t][1]+self.actal_o_m['1-2'][t][2]+self.actal_o_m['1-2'][t][3]
         self.ZhuanYi1to2.append(a12)
         b21= self.actal_o_m['2-1'][t][0] + self.actal_o_m['2-1'][t][1] + self.actal_o_m['2-1'][t][2] + self.actal_o_m['2-1'][t][3]
 
         self.ZhuanYi2to1.append(b21)
-       # print('1-2转移流', t, h, self.ZhuanYi1to2)
-       # print('2-1转移流', t, h, self.ZhuanYi2to1)
+        # print('1-2转移流', t, h, self.ZhuanYi1to2)
+        # print('2-1转移流', t, h, self.ZhuanYi2to1)
         reward = -(abs(M1_2[t] - a12) + abs(M2_1[t] - b21))
         # print('区域1——2预期转移值is%s,区域1——2实际转移值is%s,差值是 %s' % (round(M1_2[t], 2),round(a12, 2),round(abs(M1_2[t] - a12), 2)))
         # print('区域2——1预期转移值is%s,区域2——1实际转移值is%s,差值是 %s' % (round(M2_1[t], 2), round(b21, 2), round(abs(M2_1[t] - b21), 2)))
         # print('两个区域的转移差值是%s'%(-reward))
         state = []
         for h in range(4):
-          # print(h)
-          for i in self.n_m:
-               # print(i)
-               self.n_m[i][t+1][h] = self.n_m[i][t][h] + self.i_mc[i][t][h] - self.o_m[i][t][h]
-               state.append(self.n_m[i][t][h])
-               # print(state)
-               # print(len(state))
+            # print(h)
+            for i in self.n_m:
+                # print(i)
+                self.n_m[i][t+1][h] = self.n_m[i][t][h] + self.i_mc[i][t][h] - self.o_m[i][t][h]
+                state.append(self.n_m[i][t][h])
+                # print(state)
+                # print(len(state))
         state.append(M1_2[t+1])
         state.append(M2_1[t+1])
-           # print(reward)
+        # print(reward)
         if t==control_step:
-               done=True
+            done=True
         else:
-               done = False
+            done = False
         return  reward,state,done
 
 
@@ -494,8 +502,8 @@ def Oringin():
         huanjing = env()
         s =huanjing.s_start
         while True:
-            a=4
-            r, s_, done= env.Doaction(huanjing, t,a,demand)
+            b=4
+            r, s_, done= env.Doaction(huanjing, t,b,demand)
             # print('现在时间是',t)
             t += 1
             episode_reward_sum += -r
@@ -517,12 +525,12 @@ def DQN():
         huanjing = env()
         s =huanjing.s_start
         while True:                                                         # 开始一个episode (每一个循环代表一步)                                  # 显示实验动画
-             a= dqn.choose_action(s)
+             b= dqn.choose_action(s)
              # print("t is ", t)# 输入该步对应的状态s，选择动作
              # print('a is ',a)
-             r,s_,done=env.Doaction(huanjing,t,a,demand)
+             r,s_,done=env.Doaction(huanjing,t,b,demand)
              t+=1
-             dqn.store_transition(s, a, r, s_)                 # 存储样本
+             dqn.store_transition(s, b, r, s_)                 # 存储样本
              # print('奖赏值',r)
 
              episode_reward_sum += -r                           # 逐步加上一个episode内每个step的reward
@@ -601,16 +609,16 @@ def PictureTest(x,y):
     plt.show()
 # if __name__ == "__main__":
 
-control_step=99
+control_step=20
 episode=100
 
 reward_oringin=Oringin()
 print(reward_oringin)
 origin_r=[]
-for i in range(episode):
-    origin_r.append(reward_oringin)
-Episode,Episode_reward=DQN()
-ResultTrain(Episode,Episode_reward,origin_r)
-
-Q,MeanRewardPerStep,time=TestDQN()
-PictureTest(time,MeanRewardPerStep)
+# for i in range(episode):
+#     origin_r.append(reward_oringin)
+# Episode,Episode_reward=DQN()
+# ResultTrain(Episode,Episode_reward,origin_r)
+#
+# Q,MeanRewardPerStep,time=TestDQN()
+# PictureTest(time,MeanRewardPerStep)
