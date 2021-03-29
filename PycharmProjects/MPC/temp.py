@@ -25,7 +25,7 @@ M1_2,M2_1,U21,U12,x,N1,N2,m1,m2=bbb.M1_2,bbb.M2_1,bbb.U21,bbb.U12,bbb.x,bbb.N1,b
 picture_u(x,U21,U12)
 picture_m(x,M2_1,M1_2)
 
-
+#######################强化学习##################################
 BATCH_SIZE = 32                                # 样本数量
 LR = 0.02                                       # 学习率
 EPSILON = 0.8                                   # greedy policy
@@ -389,7 +389,7 @@ class env(object):
             # totalnumber_oneroad=self.n_m['出口1'][t][h]+self.n_m['出口2'][t][h]+self.n_m['出口3'][t][h]+self.n_m['出口4'][t][h]
             totalnumber_onetime+=totalnumber_oneroad
             delay_fourroad.append(dd)
-            print('当前控制时间为%s,路口编号为%s,此控制区间的总延误为%s'%(t,h,dd))
+            # print('当前控制时间为%s,路口编号为%s,此控制区间的总延误为%s'%(t,h,dd))
 
             self.remain_s_m['出口1'][t][h] = self.s_m['出口1'][t][h] - self.trans_s_m['出口1'][t][h]
             self.remain_l_m['出口1'][t][h] = self.l_m['出口1'][t][h] - self.trans_l_m['出口1'][t][h]
@@ -450,7 +450,7 @@ class env(object):
         # print(self.actal_o_m['2-1'][t][2])
         # print(self.actal_o_m['2-1'][t][2])
         AV_delay=delay_total/totalnumber_onetime
-        print('当前时刻四个路口总延误时间%s,当前时刻四个路口总的交通流%s,每个路口的总延误时间%s,车均延误为%s'%(delay_total,totalnumber_onetime,delay_fourroad,AV_delay))
+        # print('当前时刻四个路口总延误时间%s,当前时刻四个路口总的交通流%s,每个路口的总延误时间%s,车均延误为%s'%(delay_total,totalnumber_onetime,delay_fourroad,AV_delay))
         a12=self.actal_o_m['1-2'][t][0]+self.actal_o_m['1-2'][t][1]+self.actal_o_m['1-2'][t][2]+self.actal_o_m['1-2'][t][3]
         self.ZhuanYi1to2.append(a12)
         b21= self.actal_o_m['2-1'][t][0] + self.actal_o_m['2-1'][t][1] + self.actal_o_m['2-1'][t][2] + self.actal_o_m['2-1'][t][3]
@@ -478,7 +478,7 @@ class env(object):
             done=True
         else:
             done = False
-        return  reward,state,done
+        return  reward,state,done,delay_total,totalnumber_onetime
 
 
 def picture(x,y1,y2):
@@ -501,16 +501,24 @@ def Oringin():
         episode_reward_sum = 0                                              # 初始化该循环对应的episode的总奖励
         huanjing = env()
         s =huanjing.s_start
+        delay_totaltime=0
+        totalnumber_totaltime=0
         while True:
             b=4
-            r, s_, done= env.Doaction(huanjing, t,b,demand)
+            r, s_, done,delay_total,totalnumber_onetime= env.Doaction(huanjing, t,b,demand)
+            delay_totaltime+=delay_total
+            totalnumber_totaltime+=totalnumber_onetime
+
             # print('现在时间是',t)
             t += 1
             episode_reward_sum += -r
             s = s_
             if done:  # 如果done为True
                 #             # round()方法返回episode_reward_sum的小数点四舍五入到2个数字
+                AverageDelay_totaltime =delay_totaltime/totalnumber_totaltime
                 print('episode%s---reward_sum: %s' % (i, round(episode_reward_sum, 2)))
+                print('当前回合%s,所有控制步数后路口总延误时间%s,所有控制步数后路口总的交通流%s,当前回合车均延误为%s' % (i,round(delay_totaltime,4),
+                round(totalnumber_totaltime,4),round(AverageDelay_totaltime,4)))
                 Q = round(episode_reward_sum, 2)
                 Episode_reward.append(Q)
                 break
@@ -524,11 +532,15 @@ def DQN():
         episode_reward_sum = 0                                              # 初始化该循环对应的episode的总奖励
         huanjing = env()
         s =huanjing.s_start
+        delay_totaltime = 0
+        totalnumber_totaltime = 0
         while True:                                                         # 开始一个episode (每一个循环代表一步)                                  # 显示实验动画
              b= dqn.choose_action(s)
              # print("t is ", t)# 输入该步对应的状态s，选择动作
              # print('a is ',a)
-             r,s_,done=env.Doaction(huanjing,t,b,demand)
+             r, s_, done, delay_total, totalnumber_onetime = env.Doaction(huanjing, t, b, demand)
+             delay_totaltime += delay_total
+             totalnumber_totaltime += totalnumber_onetime
              t+=1
              dqn.store_transition(s, b, r, s_)                 # 存储样本
              # print('奖赏值',r)
@@ -540,7 +552,10 @@ def DQN():
                  dqn.learn()
              if done:  # 如果done为True
     #             # round()方法返回episode_reward_sum的小数点四舍五入到2个数字
+                 AverageDelay_totaltime = delay_totaltime / totalnumber_totaltime
                  print('episode%s---reward_sum: %s' % (i, round(episode_reward_sum, 2)))
+                 print('当前回合%s,所有控制步数后路口总延误时间%s,所有控制步数后路口总的交通流%s,当前回合车均延误为%s'
+                       % (i, round(delay_totaltime, 4), round(totalnumber_totaltime, 4), round(AverageDelay_totaltime, 4)))
                  Q = round(episode_reward_sum, 2)
                  Episode.append(i)
                  if i<=60:
@@ -578,6 +593,8 @@ def TestDQN():
     Episode_reward = []
     MeanRewardPerStep=[]
     time=[]
+    delay_totaltime = 0
+    totalnumber_totaltime = 0
     for i in range(1):                                                    # 400个episode循环
         print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<OriginEpisode: %s' % i)
         t=0                                                     # 重置环境
@@ -586,7 +603,9 @@ def TestDQN():
         s =huanjing.s_start
         while True:
             a= dqn.Testchoose_action(s)
-            r, s_, done= env.Doaction(huanjing, t,a,demand)
+            r, s_, done, delay_total, totalnumber_onetime = env.Doaction(huanjing, t,a,demand)
+            delay_totaltime += delay_total
+            totalnumber_totaltime += totalnumber_onetime
             t += 1
             episode_reward_sum += -r
             MRPStep=episode_reward_sum/t
@@ -595,7 +614,11 @@ def TestDQN():
             s = s_
             if done:  # 如果done为True
                 #             # round()方法返回episode_reward_sum的小数点四舍五入到2个数字
+                AverageDelay_totaltime = delay_totaltime / totalnumber_totaltime
                 print('episode%s---reward_sum: %s' % (i, round(episode_reward_sum, 2)))
+                print('当前回合%s,所有控制步数后路口总延误时间%s,所有控制步数后路口总的交通流%s,当前回合车均延误为%s'
+                      % (
+                      i, round(delay_totaltime, 4), round(totalnumber_totaltime, 4), round(AverageDelay_totaltime, 4)))
                 Q = round(episode_reward_sum, 2)
                 Episode_reward.append(Q)
                 break
@@ -609,16 +632,16 @@ def PictureTest(x,y):
     plt.show()
 # if __name__ == "__main__":
 
-control_step=20
+control_step=99
 episode=100
 
 reward_oringin=Oringin()
 print(reward_oringin)
 origin_r=[]
-# for i in range(episode):
-#     origin_r.append(reward_oringin)
-# Episode,Episode_reward=DQN()
-# ResultTrain(Episode,Episode_reward,origin_r)
-#
-# Q,MeanRewardPerStep,time=TestDQN()
-# PictureTest(time,MeanRewardPerStep)
+for i in range(episode):
+    origin_r.append(reward_oringin)
+Episode,Episode_reward=DQN()
+ResultTrain(Episode,Episode_reward,origin_r)
+
+Q,MeanRewardPerStep,time=TestDQN()
+PictureTest(time,MeanRewardPerStep)
