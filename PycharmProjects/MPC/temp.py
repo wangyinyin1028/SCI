@@ -505,7 +505,7 @@ def Oringin():
         totalnumber_totaltime=0
         while True:
             b=4
-            r, s_, done,delay_total,totalnumber_onetime= env.Doaction(huanjing, t,b,demand)
+            r, s_, done,delay_total,totalnumber_onetime= env.Doaction(huanjing,t,b,demand)
             delay_totaltime+=delay_total
             totalnumber_totaltime+=totalnumber_onetime
 
@@ -538,7 +538,7 @@ def DQN():
              b= dqn.choose_action(s)
              # print("t is ", t)# 输入该步对应的状态s，选择动作
              # print('a is ',a)
-             r, s_, done, delay_total, totalnumber_onetime = env.Doaction(huanjing, t, b, demand)
+             r, s_, done, delay_total, totalnumber_onetime = env.Doaction(huanjing,t, b, demand)
              delay_totaltime += delay_total
              totalnumber_totaltime += totalnumber_onetime
              t+=1
@@ -640,8 +640,8 @@ print(reward_oringin)
 origin_r=[]
 for i in range(episode):
     origin_r.append(reward_oringin)
-Episode,Episode_reward=DQN()
-ResultTrain(Episode,Episode_reward,origin_r)
+# Episode,Episode_reward=DQN()
+# ResultTrain(Episode,Episode_reward,origin_r)
 
-Q,MeanRewardPerStep,time=TestDQN()
-PictureTest(time,MeanRewardPerStep)
+# Q,MeanRewardPerStep,time=TestDQN()
+# PictureTest(time,MeanRewardPerStep)
