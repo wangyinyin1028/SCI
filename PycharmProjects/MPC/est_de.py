@@ -5,7 +5,7 @@ import pickle
 a, b, c = 60, 180, 240
 p, q = 0.3, 0.17
 x,y,z = 60, 180, 240#高需求
-m,n = 0.33, 0.2#高需求
+m,n = 0.5, 0.3#高需求
 
 class TrafficDemand:
     def __init__(self):
