@@ -1,13 +1,6 @@
-import random
 import pickle
-import matplotlib.pyplot as plt
-import numpy as np
-import math
-import torch
-import torch.nn as nn
-import torch.nn.functional as F                 # 导入torch.nn.functional
-from PycharmProjects.MPC.est_mpc import picture_u,picture_m,picture_mfd1,picture_mfd2
-from stable_baselines.common.env_checker import check_env
+from PycharmProjects.MPC.est_mpc import picture_u,picture_m, picture_mfd2
+
 #############产生高需求与低需求，两个场景###################
 f0 = open(r'E:\wyy\PycharmProjects\MPC\temp_file\aa.pkl', 'rb')
 bb = pickle.load(f0)
@@ -30,11 +23,10 @@ picture_m(x,M2_1,M1_2)
 ##############################stable baselines################################################################
 
 import gym
-import numpy as np
 import math
-import random
-from gym.spaces import Discrete, MultiDiscrete, MultiBinary, Box
-from stable_baselines.bench.monitor import Monitor
+from gym.spaces import Discrete, Box
+
+
 class IdentityEnv(gym.Env):
   """Custom Environment that follows gym interface"""
   metadata = {'render.modes': ['human']}
@@ -277,22 +269,16 @@ class IdentityEnv(gym.Env):
 ###################################################################################
 import pytest
 import numpy as np
-from stable_baselines import A2C, ACER, ACKTR, DQN, DDPG, SAC, PPO1, PPO2, TD3, TRPO
-from stable_baselines.ddpg import NormalActionNoise
-from stable_baselines.common.vec_env import DummyVecEnv,VecNormalize, \
-    VecFrameStack, SubprocVecEnv
+from stable_baselines import A2C, ACER, ACKTR, DQN, PPO1, PPO2, TRPO
+from PycharmProjects.MPC.temp_file.common.vec_env import DummyVecEnv
 from stable_baselines.common.evaluation import evaluate_policy
 import os
 
-import gym
 import numpy as np
 import matplotlib.pyplot as plt
 
-from stable_baselines.ddpg.policies import LnMlpPolicy
-
 from stable_baselines.results_plotter import load_results, ts2xy
-from stable_baselines import DDPG, TD3
-from stable_baselines.common.noise import AdaptiveParamNoiseSpec, NormalActionNoise
+
 best_mean_reward, n_steps = -np.inf, 0
 log_dir = "tmp/"
 os.makedirs(log_dir, exist_ok=True)
@@ -324,27 +310,27 @@ def callback(_locals, _globals):
     return True
 
 LEARN_FUNC_DICT = {
-    'a2c': lambda e: A2C(policy="MlpPolicy", learning_rate=1e-3, n_steps=1, gamma=0.7, env=e, seed=0).learn(total_timesteps=10000),
+    'a2c': lambda e: A2C(policy="MlpPolicy", learning_rate=1e-3, n_steps=1, gamma=0.7, env=e, seed=0,tensorboard_log="./a2c_tensorboard/").learn(total_timesteps=10000),
     'acer': lambda e: ACER(policy="MlpPolicy", env=e, seed=0,
-                           n_steps=1, replay_ratio=1).learn(total_timesteps=15000),
+                           n_steps=1, replay_ratio=1,tensorboard_log="./acer_tensorboard/").learn(total_timesteps=15000),
     'acktr': lambda e: ACKTR(policy="MlpPolicy", env=e, seed=0,
-                             learning_rate=5e-4, n_steps=1).learn(total_timesteps=20000),
+                             learning_rate=5e-4, n_steps=1,tensorboard_log="./acktr_tensorboard/").learn(total_timesteps=20000),
 
 
 
 
     'dqn': lambda e: DQN(policy="MlpPolicy", batch_size=32,learning_starts=100, gamma=0.7,learning_rate=0.001,
-                         exploration_fraction=0.0001, env=e, seed=0).learn(total_timesteps=10000,callback=None),
+                         exploration_fraction=0.0001, env=e, verbose=1,seed=0,tensorboard_log="./dqn_tensorboard/").learn(total_timesteps=20000,callback=None),
 # 这里的exploration_fraction其实是控制多少步来更新贪婪参数 [公式] 的，0.1表示每10步更新一次
 
 
 
     'ppo1': lambda e: PPO1(policy="MlpPolicy", env=e, seed=0, lam=0.5,
-                           optim_batchsize=16, optim_stepsize=1e-3).learn(total_timesteps=15000),
+                           optim_batchsize=16, optim_stepsize=1e-3,tensorboard_log="./ppo1_tensorboard/").learn(total_timesteps=15000),
     'ppo2': lambda e: PPO2(policy="MlpPolicy", env=e, seed=0,
-                           learning_rate=1.5e-3, lam=0.8).learn(total_timesteps=20000),
+                           learning_rate=1.5e-3, lam=0.8,tensorboard_log="./ppo2_tensorboard/").learn(total_timesteps=20000),
     'trpo': lambda e: TRPO(policy="MlpPolicy", env=e, seed=0,
-                           max_kl=0.05, lam=0.7).learn(total_timesteps=10000),}
+                           max_kl=0.05, lam=0.7,tensorboard_log="./TRPO_tensorboard/").learn(total_timesteps=10000),}
 
 @pytest.mark.slow
 @pytest.mark.parametrize("model_name", ['a2c', 'acer', 'acktr', 'dqn', 'ppo1', 'ppo2', 'trpo'])
@@ -356,9 +342,9 @@ def test_identity(model_name):
     """
     env = DummyVecEnv([lambda: IdentityEnv(18,18,10)])
     filename = (r'E:\wyy\PycharmProjects\MPC\temp_file')
-    Monitorr = Monitor(env, filename, allow_early_resets=False, reset_keywords=(), info_keywords=())
-    episode_lengths=Monitorr.get_episode_lengths()
-    print(episode_lengths)
+    # Monitorr = Monitor(env, filename, allow_early_resets=False, reset_keywords=(), info_keywords=())
+    # episode_lengths=Monitorr.get_episode_lengths()
+    # print(episode_lengths)
     model = LEARN_FUNC_DICT[model_name](env)
     mean_reward, std_reward=evaluate_policy(model, env, n_eval_episodes=20, reward_threshold=None,return_episode_rewards=True)
 
@@ -393,31 +379,31 @@ def ResultTrain(Episode,Episode_reward):
 #
 
 
-# rewarda2c, eps_step=test_identity('a2c')
+rewarda2c, eps_step=test_identity('a2c')
 # Episode=np.arange(1,len(rewarda2c)+1,1)
 # ResultTrain(Episode,Episode_reward=rewarda2c)
 
-# reward_acer, eps_step=test_identity('acer')
+reward_acer, eps_step=test_identity('acer')
 # Episode=np.arange(1,len(reward_acer)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_acer)
 #
-# reward_acktr, eps_step=test_identity('acktr')
+reward_acktr, eps_step=test_identity('acktr')
 # Episode=np.arange(1,len(reward_acktr)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_acktr)
 #
 reward_dqn, eps_step=test_identity('dqn')
-Episode=np.arange(1,len(reward_dqn)+1,1)
+# Episode=np.arange(1,len(reward_dqn)+1,1)
 # print('DQN训练每回合的奖赏结果is',reward_dqn)
-ResultTrain(Episode,Episode_reward=reward_dqn)
+# ResultTrain(Episode,Episode_reward=reward_dqn)
 #
-# reward_ppo1, eps_step=test_identity('ppo1')
+reward_ppo1, eps_step=test_identity('ppo1')
 # Episode=np.arange(1,len(reward_ppo1)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_ppo1)
 #
-# reward_ppo2, eps_step=test_identity('ppo2')
+reward_ppo2, eps_step=test_identity('ppo2')
 # Episode=np.arange(1,len(reward_ppo2)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_ppo2)
 #
-# reward_trpo, eps_step=test_identity('trpo')
+reward_trpo, eps_step=test_identity('trpo')
 # Episode=np.arange(1,len(reward_trpo)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_trpo)
