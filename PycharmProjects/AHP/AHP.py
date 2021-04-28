@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
 import warnings
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 b1 = np.array([[1, 1 / 2, 1 / 3], [2, 1, 2], [3, 1 / 2, 1]])
 b2 = np.array([[1, 1 / 3, 1 / 2,1/5], [3 , 1, 3, 1/4], [2, 1/3, 1, 1 / 4], [5, 4, 4, 1]])
 b3 = np.array([[1, 1 / 2, 3, 5], [2 , 1, 4, 5], [1/3, 1/4, 1 , 4], [1/5, 1/5, 1/4, 1]])
@@ -27,6 +29,13 @@ BianHua=[
 ]
 YouXuBianHua=[[1,0,0,0,0],[0.9,0.1,0,0,0],[0.8,0.2,0,0,0],[0.7,0.3,0,0,0],[0.6,0.4,0,0,0],[0.5,0.5,0,0,0],
 [0.4,0.6,0,0,0],[0.3,0.7,0,0,0],[0.2,0.8,0,0,0],[0.1,0.9,0,0,0],[0,1,0,0,0]]
+config = {
+            "font.family": 'serif',
+            "font.size": 10,
+            "mathtext.fontset": 'stix',
+            "font.serif": ['SimSun'],
+         }
+# rcParams.update(config)
 
 class AHP:
     def __init__(self, b):
@@ -176,21 +185,22 @@ def value(temp):
             LX.append(C1)
     return LS,LSJ, LX,y
 
+
 def fig_value(y,LS,LSJ,LX):
     plt.figure(figsize=(6, 4))
-    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['font.sans-serif'] = ['SimSun']
     plt.rcParams['axes.unicode_minus'] = False
     plt.xticks(range(0, 12, 1),
-               labels=['X11', 'X12', 'X13', 'X14', 'X21',
-                       'X22', 'X23', 'X24', 'X31', 'X32', 'X33',
-                       'X34'])
+               labels=['$X_{11}$', '$X_{12}$', '$X_{13}$', '$X_{14}$', '$X_{21}$',
+                       '$X_{22}$', '$X_{23}$', '$X_{24}$', '$X_{31}$', '$X_{32}$', '$X_{33}$',
+                       '$X_{34}$'], fontproperties='Times New Roman')
     plt.xticks(rotation=30)  # 倾斜70度
     plt.xlabel('指标')
     plt.title('指标隶属度随机变化')
-    plt.ylabel('分值')
-    plt.plot(y, LS, label='Ls', linewidth=0.5)
-    plt.plot(y, LSJ, label='Ljh', linewidth=0.5)
-    plt.plot(y, LX, label='Lx', linewidth=0.5)
+    plt.ylabel('评价分值')
+    plt.plot(y, LS, label='$L_s$', linewidth=0.5, linestyle=':', marker='*', ms=3)  # ms对应是marker大小
+    plt.plot(y, LSJ, label='$L_{jh}$', linewidth=0.5, linestyle='--', marker='v', markerfacecolor='none', ms=3)
+    plt.plot(y, LX, label='$L_x$', linewidth=0.5, linestyle='-', marker='o', ms=3)
     plt.legend(loc='upper left')
     plt.show()
 
@@ -218,7 +228,7 @@ def fig_2(YouXuBianHua,sss):
     for i in range(len(YouXuBianHua)):
         y.append(i+1)
     plt.figure(figsize=(6, 4))
-    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['font.sans-serif'] = ['SimSun']
     plt.rcParams['axes.unicode_minus'] = False
     plt.xlabel('指标隶属度')
     plt.title('指标隶属度有序变化')
@@ -226,18 +236,18 @@ def fig_2(YouXuBianHua,sss):
     plt.xticks(range(0, 11, 1),labels=['[1,0,0,0,0]', '[0.9,0.1,0,0,0]', '[0.8,0.2,0,0,0]', '[0.7,0.3,0,0,0]', '[0.6,0.4,0,0,0]',
                        '[0.5,0.5,0,0,0]', '[0.4,0.6,0,0,0]', '[0.3,0.7,0,0,0]', '[0.2,0.8,0,0,0]', '[0.1,0.9,0,0,0]', '[0,1,0,0,0]'])
     plt.xticks(rotation=30)  # 倾斜70度
-    plt.plot(y, sss[0], label='X11', linewidth=0.5,linestyle='-',marker='o')
-    # plt.plot(y,  sss[1], label='X12', linewidth=0.5,linestyle='-',marker='^')
-    # plt.plot(y,  sss[2], label='X13', linewidth=0.5,linestyle='-',marker='*')
-    # plt.plot(y, sss[3], label='X14', linewidth=0.5,linestyle='-',marker='x')
-    plt.plot(y, sss[4], label='X21', linewidth=0.5, linestyle='-', marker='2')
-    # plt.plot(y, sss[5], label='X22', linewidth=0.5, linestyle='-', marker='>')
-    # plt.plot(y, sss[6], label='X23', linewidth=0.5, linestyle='-', marker='4')
-    # plt.plot(y, sss[7], label='X24', linewidth=0.5, linestyle='-', marker='p')
-    plt.plot(y, sss[8], label='X31', linewidth=0.5, linestyle='-', marker='h')
-    # plt.plot(y, sss[9], label='X32', linewidth=0.5, linestyle='-', marker='+')
-    # plt.plot(y, sss[10], label='X33', linewidth=0.5, linestyle='-', marker='D')
-    # plt.plot(y, sss[11], label='X34', linewidth=0.5, linestyle='-', marker='3')
+    # plt.plot(y, sss[0], label='$X_{11}$', linewidth=1, linestyle='-', marker='o')
+    # plt.plot(y,  sss[1], label='$X_{12}$', linewidth=0.5,linestyle='-',marker='^')
+    # plt.plot(y,  sss[2], label='$X_{13}$', linewidth=0.5,linestyle='-',marker='*')
+    # plt.plot(y, sss[3], label='$X_{14}$', linewidth=0.5,linestyle='-',marker='x')
+    # plt.plot(y, sss[4], label='$X_{21}$', linewidth=1, linestyle='-', marker='2')
+    # plt.plot(y, sss[5], label='$X_{22}$', linewidth=0.5, linestyle='-', marker='>')
+    # plt.plot(y, sss[6], label='$X_{23}$', linewidth=0.5, linestyle='-', marker='4')
+    # plt.plot(y, sss[7], label='$X_{24}$', linewidth=0.5, linestyle='-', marker='p')
+    plt.plot(y, sss[8], label='$X_{31}$', linewidth=1, linestyle='-', marker='h')
+    plt.plot(y, sss[9], label='$X_{32}$', linewidth=0.5, linestyle='-', marker='+')
+    plt.plot(y, sss[10], label='$X_{33}$', linewidth=0.5, linestyle='-', marker='D')
+    plt.plot(y, sss[11], label='$X_{34}$', linewidth=0.5, linestyle='-', marker='3')
 
     # plt.plot(y, sss[4], label='A15', linewidth=0.5)
     plt.legend(loc='upper left')
@@ -279,7 +289,7 @@ if __name__ == '__main__':
     LS,LSJ,LX,y=value(temp)
     fig_value(y,LS,LSJ,LX)
     sss=All_result(A=3,B=4)#A表newr中行数，B表列数
-    fig_2(YouXuBianHua,sss)
+    # fig_2(YouXuBianHua,sss)
     SSS=All_result(3,0)
     # fig_3(YouXuBianHua, sss)
 

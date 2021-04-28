@@ -1,5 +1,29 @@
 import pickle
 from PycharmProjects.MPC.est_mpc import picture_u,picture_m, picture_mfd2
+from stable_baselines.common.callbacks import BaseCallback
+import tensorflow as tf
+from stable_baselines.bench import Monitor
+from stable_baselines.results_plotter import load_results, ts2xy
+from stable_baselines import results_plotter
+from stable_baselines.common.env_checker import check_env
+import pytest
+import numpy as np
+from stable_baselines import A2C, ACER, ACKTR, DQN, PPO1, PPO2, TRPO
+from PycharmProjects.MPC.temp_file.common.vec_env import DummyVecEnv
+from stable_baselines.common.evaluation import evaluate_policy
+import os
+import matplotlib.pyplot as plt
+import gym
+import math
+from gym.spaces import Discrete, Box
+
+
+
+# best_mean_reward, n_steps = -np.inf, 0
+log_dir = "tmp/"
+os.makedirs(log_dir, exist_ok=True)
+
+
 
 #############产生高需求与低需求，两个场景###################
 f0 = open(r'E:\wyy\PycharmProjects\MPC\temp_file\aa.pkl', 'rb')
@@ -15,17 +39,60 @@ f2.close()
 M1_2,M2_1,U21,U12,x,N1,N2,m1,m2=bbb.M1_2,bbb.M2_1,bbb.U21,bbb.U12,bbb.x,bbb.N1,bbb.N2,bbb.m1,bbb.m2
 # print(M1_2)
 # print(M2_1)
-picture_u(x,U21,U12)
-picture_m(x,M2_1,M1_2)
+# picture_u(x,U21,U12)
+# picture_m(x,M2_1,M1_2)
 
 
 
 ##############################stable baselines################################################################
 
-import gym
-import math
-from gym.spaces import Discrete, Box
 
+class SaveOnBestTrainingRewardCallback(BaseCallback):
+    """
+    Callback for saving a model (the check is done every ``check_freq`` steps)
+    based on the training reward (in practice, we recommend using ``EvalCallback``).
+
+    :param check_freq: (int)
+    :param log_dir: (str) Path to the folder where the model will be saved.
+      It must contains the file created by the ``Monitor`` wrapper.
+    :param verbose: (int)
+    """
+    def __init__(self, check_freq: int, log_dir: str, verbose=1):
+        super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
+        self.check_freq = check_freq
+        self.log_dir = log_dir
+        self.save_path = os.path.join(log_dir, 'best_model')#拼接路径的作用
+        self.best_mean_reward = -np.inf
+
+    def _init_callback(self) -> None:
+        # Create folder if needed
+        if self.save_path is not None:
+            os.makedirs(self.save_path, exist_ok=True)#用于递归创建目录，以避免在目录已经存在的情况下引发异常
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.check_freq == 0:
+
+          # Retrieve training reward
+          x, y = ts2xy(load_results(self.log_dir), 'timesteps')
+          # a, b = ts2xy(load_results(self.log_dir), 'episodes')
+          # print('load_results(self.log_dir):{}'.format(load_results(self.log_dir)))
+          # print("x: {},y: {},a: {},b: {}".format(x,y,a,b))
+          if len(x) > 0:
+              # Mean training reward over the last 100 episodes
+              mean_reward = np.mean(y[-100:])
+              if self.verbose > 0:
+                print("Num timesteps: {}".format(self.num_timesteps))
+                print("Best mean reward: {:.2f} - Last mean reward per episode: {:.2f}".format(self.best_mean_reward, mean_reward))
+
+              # New best model, you could save the agent here
+              if mean_reward > self.best_mean_reward:
+                  self.best_mean_reward = mean_reward
+                  # Example for saving best model
+                  if self.verbose > 0:
+                    print("Saving new best model to {}".format(self.save_path))
+                  self.model.save(self.save_path)
+
+        return True
 
 class IdentityEnv(gym.Env):
   """Custom Environment that follows gym interface"""
@@ -263,74 +330,40 @@ class IdentityEnv(gym.Env):
 
 
 
-
-
-
-###################################################################################
-import pytest
-import numpy as np
-from stable_baselines import A2C, ACER, ACKTR, DQN, PPO1, PPO2, TRPO
-from PycharmProjects.MPC.temp_file.common.vec_env import DummyVecEnv
-from stable_baselines.common.evaluation import evaluate_policy
-import os
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-from stable_baselines.results_plotter import load_results, ts2xy
-
-best_mean_reward, n_steps = -np.inf, 0
-log_dir = "tmp/"
-os.makedirs(log_dir, exist_ok=True)
-
-def callback(_locals, _globals):
-    """
-    Callback called at each step (for DQN an others) or after n steps (see ACER or PPO2)
-    :param _locals: (dict)
-    :param _globals: (dict)
-    """
-    global n_steps, best_mean_reward
-    # Print stats every 1000 calls
-    if (n_steps + 1) % 1000 == 0:
-        # Evaluate policy training performance
-        x, y = ts2xy(load_results(log_dir), 'timesteps')
-        if len(x) > 0:
-            mean_reward = np.mean(y[-100:])
-            print(x[-1], 'timesteps')
-            print("Best mean reward: {:.2f} - Last mean reward per episode: {:.2f}".format(best_mean_reward, mean_reward))
-
-            # New best model, you could save the agent here
-            if mean_reward > best_mean_reward:
-                best_mean_reward = mean_reward
-                # Example for saving best model
-                print("Saving new best model")
-                _locals['self'].save(log_dir + 'best_model.pkl')
-    n_steps += 1
-    # Returning False will stop training early
-    return True
-
 LEARN_FUNC_DICT = {
-    'a2c': lambda e: A2C(policy="MlpPolicy", learning_rate=1e-3, n_steps=1, gamma=0.7, env=e, seed=0,tensorboard_log="./a2c_tensorboard/").learn(total_timesteps=10000),
+    'a2c': lambda e: A2C(policy="MlpPolicy", learning_rate=1e-3, n_steps=1, gamma=0.7, env=e, seed=0,tensorboard_log="./a2c_tensorboard/").learn(total_timesteps=10000,),
     'acer': lambda e: ACER(policy="MlpPolicy", env=e, seed=0,
-                           n_steps=1, replay_ratio=1,tensorboard_log="./acer_tensorboard/").learn(total_timesteps=15000),
+                           n_steps=1, replay_ratio=1,tensorboard_log="./acer_tensorboard/").learn(total_timesteps=10000),
     'acktr': lambda e: ACKTR(policy="MlpPolicy", env=e, seed=0,
-                             learning_rate=5e-4, n_steps=1,tensorboard_log="./acktr_tensorboard/").learn(total_timesteps=20000),
+                             learning_rate=5e-4, n_steps=1,tensorboard_log="./acktr_tensorboard/").learn(total_timesteps=10000),
 
-
-
-
-    'dqn': lambda e: DQN(policy="MlpPolicy", batch_size=32,learning_starts=100, gamma=0.7,learning_rate=0.001,
-                         exploration_fraction=0.0001, env=e, verbose=1,seed=0,tensorboard_log="./dqn_tensorboard/").learn(total_timesteps=20000,callback=None),
-# 这里的exploration_fraction其实是控制多少步来更新贪婪参数 [公式] 的，0.1表示每10步更新一次
-
-
+    'dqn': lambda e: DQN(policy="MlpPolicy", batch_size=32,learning_starts=0, gamma=0.1,exploration_final_eps=0.05,
+                         exploration_fraction=0.1, env=e, verbose=1,seed=0,tensorboard_log="./dqn_tensorboard/").learn(total_timesteps=10000,callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)),
+# 这里的exploration_fraction其实是控制多少步来更新贪婪参数 [公式] 的，0.1表示每10步更新一次,tensorboard_log="./dqn_tensorboard/"，,tensorboard_log="./ppo1_tensorboard/"
 
     'ppo1': lambda e: PPO1(policy="MlpPolicy", env=e, seed=0, lam=0.5,
-                           optim_batchsize=16, optim_stepsize=1e-3,tensorboard_log="./ppo1_tensorboard/").learn(total_timesteps=15000),
+                           optim_batchsize=16, optim_stepsize=1e-3).learn(total_timesteps=60000),
     'ppo2': lambda e: PPO2(policy="MlpPolicy", env=e, seed=0,
-                           learning_rate=1.5e-3, lam=0.8,tensorboard_log="./ppo2_tensorboard/").learn(total_timesteps=20000),
+                           learning_rate=1.5e-3, lam=0.8,tensorboard_log="./ppo2_tensorboard/").learn(total_timesteps=10000),
     'trpo': lambda e: TRPO(policy="MlpPolicy", env=e, seed=0,
-                           max_kl=0.05, lam=0.7,tensorboard_log="./TRPO_tensorboard/").learn(total_timesteps=10000),}
+                           max_kl=0.05, lam=0.7,tensorboard_log="./TRPO_tensorboard/").learn(total_timesteps=10000),}##缺少HER，GAIL
+# LEARN_FUNC_DICT = {
+#     'a2c': lambda e: A2C(policy="MlpPolicy", learning_rate=1e-3, n_steps=1, gamma=0.7, env=e, seed=0).learn(total_timesteps=10000),
+#     'acer': lambda e: ACER(policy="MlpPolicy", env=e, seed=0,
+#                            n_steps=1, replay_ratio=1).learn(total_timesteps=15000),
+#     'acktr': lambda e: ACKTR(policy="MlpPolicy", env=e, seed=0,
+#                              learning_rate=5e-4, n_steps=1).learn(total_timesteps=10000),
+#
+#     'dqn': lambda e: DQN(policy="MlpPolicy", batch_size=32,learning_starts=100, gamma=0.7,learning_rate=0.001,
+#                          exploration_fraction=0.0001, env=e, verbose=1,seed=0).learn(total_timesteps=10000,callback=None),
+# # 这里的exploration_fraction其实是控制多少步来更新贪婪参数 [公式] 的，0.1表示每10步更新一次
+#
+#     'ppo1': lambda e: PPO1(policy="MlpPolicy", env=e, seed=0, lam=0.5,
+#                            optim_batchsize=16, optim_stepsize=1e-3).learn(total_timesteps=15000),
+#     'ppo2': lambda e: PPO2(policy="MlpPolicy", env=e, seed=0,
+#                            learning_rate=1.5e-3, lam=0.8).learn(total_timesteps=20000),
+#     'trpo': lambda e: TRPO(policy="MlpPolicy", env=e, seed=0,
+#                            max_kl=0.05, lam=0.7).learn(total_timesteps=10000),}
 
 @pytest.mark.slow
 @pytest.mark.parametrize("model_name", ['a2c', 'acer', 'acktr', 'dqn', 'ppo1', 'ppo2', 'trpo'])
@@ -340,26 +373,38 @@ def test_identity(model_name):
     can learn an identity transformation (i.e. return observation as an action)
     :param model_name: (str) Name of the RL model
     """
-    env = DummyVecEnv([lambda: IdentityEnv(18,18,10)])
-    filename = (r'E:\wyy\PycharmProjects\MPC\temp_file')
-    # Monitorr = Monitor(env, filename, allow_early_resets=False, reset_keywords=(), info_keywords=())
-    # episode_lengths=Monitorr.get_episode_lengths()
-    # print(episode_lengths)
-    model = LEARN_FUNC_DICT[model_name](env)
-    mean_reward, std_reward=evaluate_policy(model, env, n_eval_episodes=20, reward_threshold=None,return_episode_rewards=True)
 
+    env = DummyVecEnv([lambda: IdentityEnv(18,18,60)])
+
+    model = LEARN_FUNC_DICT[model_name](env)
+    print('已经训练结束')
+    evaluate_policy(model, env, n_eval_episodes=20, reward_threshold=None)
     obs = env.reset()
-    assert model.action_probability(obs).shape == (1, 18), "Error: action_probability not returning correct shape"
+    assert model.action_probability(obs).shape == (1, 18,), "Error: action_probability not returning correct shape"
     action = env.action_space.sample()
     action_prob = model.action_probability(obs, actions=action)
     assert np.prod(action_prob.shape) == 1, "Error: not scalar probability"
     action_logprob = model.action_probability(obs, actions=action, logp=True)
-    assert np.allclose(action_prob, np.exp(action_logprob)), (action_prob, action_logprob)
+    assert np.allclose(action_prob, np.exp(action_logprob)), (action_prob, action_logprob,)
 
     # Free memory
 
     del model, env
-    return mean_reward, std_reward
+    # return mean_reward, std_reward
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def ResultTrain(Episode,Episode_reward):
     plt.figure(figsize=(12, 4))
     plt.rcParams['font.sans-serif'] = ['SimHei']
@@ -373,37 +418,75 @@ def ResultTrain(Episode,Episode_reward):
     plt.title('高需求情况下迭代结果')
     plt.grid(True)
     plt.show()
-
+def ResultTest(Episode,Episode_reward):
+    plt.figure(figsize=(12, 4))
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.xticks(range(0, 7, 1),
+               labels=['a2c', 'acer', 'acktr', 'dqn', 'ppo1', 'ppo2', 'trpo'], fontproperties='Times New Roman')
+    plt.ylabel('平均奖赏值')
+    plt.xlabel('算法')
+    plt.plot(Episode, Episode_reward, linewidth=1,linestyle=':', marker='*', ms=5)
+    # plt.plot(Episode, origin_r, label='固定信号', linewidth=2)
+    # plt.plot(x, y2, label='u12', linewidth=0.5)
+    # plt.legend(loc='upper left')
+    plt.title('高需求情况下测试结果')
+    # plt.grid(True)
+    plt.show()
 
 
 #
+# test_identity('a2c')
+# testReward=[]
 
+# rewarda2c, eps_step=test_identity('a2c')
 
-rewarda2c, eps_step=test_identity('a2c')
 # Episode=np.arange(1,len(rewarda2c)+1,1)
 # ResultTrain(Episode,Episode_reward=rewarda2c)
 
-reward_acer, eps_step=test_identity('acer')
+# reward_acer, eps_step=test_identity('acer')
 # Episode=np.arange(1,len(reward_acer)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_acer)
 #
-reward_acktr, eps_step=test_identity('acktr')
+# reward_acktr, eps_step=test_identity('acktr')
 # Episode=np.arange(1,len(reward_acktr)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_acktr)
-#
-reward_dqn, eps_step=test_identity('dqn')
+test_identity('dqn')
+# reward_dqn, eps_step=test_identity('dqn')
+# time_steps=10000
+# results_plotter.plot_results([log_dir], time_steps, results_plotter.X_EPISODES, "DQN RESULT")
+# plt.show()
 # Episode=np.arange(1,len(reward_dqn)+1,1)
 # print('DQN训练每回合的奖赏结果is',reward_dqn)
 # ResultTrain(Episode,Episode_reward=reward_dqn)
 #
-reward_ppo1, eps_step=test_identity('ppo1')
+# reward_ppo1, eps_step=test_identity('ppo1')
 # Episode=np.arange(1,len(reward_ppo1)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_ppo1)
 #
-reward_ppo2, eps_step=test_identity('ppo2')
+# reward_ppo2, eps_step=test_identity('ppo2')
 # Episode=np.arange(1,len(reward_ppo2)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_ppo2)
 #
-reward_trpo, eps_step=test_identity('trpo')
+# reward_trpo, eps_step=test_identity('trpo')
 # Episode=np.arange(1,len(reward_trpo)+1,1)
 # ResultTrain(Episode,Episode_reward=reward_trpo)
+# print(rewarda2c)
+# print(reward_acer)
+# print(reward_acktr)
+# print(reward_dqn)
+# print(reward_ppo1)
+# print(reward_ppo2)
+# print(reward_trpo)
+#
+# testReward.append(rewarda2c)
+# testReward.append(reward_acer)
+# testReward.append(reward_acktr)
+# testReward.append(reward_dqn)
+# testReward.append(reward_ppo1)
+# testReward.append(reward_ppo2)
+# testReward.append(reward_trpo)
+# print(testReward)
+# testEpisode=np.arange(1,len(testReward)+1,1)
+# print(testEpisode)
+# ResultTest(testEpisode,testReward)
